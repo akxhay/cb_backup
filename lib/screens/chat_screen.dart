@@ -329,22 +329,21 @@ class _ChatScreenState extends State<ChatScreen> {
               fit: StackFit.expand,
               children: [
                 preview,
-                if (msg.type != MessageType.image)
-                  Positioned(
-                    bottom: 4,
-                    left: 4,
-                    right: 4,
-                    child: Container(
-                      color: Colors.black54,
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Text(
-                        filename,
-                        style: const TextStyle(color: Colors.white, fontSize: 10),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                Positioned(
+                  bottom: 4,
+                  left: 4,
+                  right: 4,
+                  child: Container(
+                    color: Colors.black54,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Text(
+                      (msg.text.isNotEmpty ? msg.text : filename),
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                ),
               ],
             ),
           ),

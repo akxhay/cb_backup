@@ -2,12 +2,33 @@ import 'package:intl/intl.dart';
 
 import '../models/chat.dart';
 
+final _lrm = '\u200E';
+
 final _timestampRe = RegExp(
-  r'^\u200e?\[(\d{2}/\d{2}/\d{2}),\s*(\d{1,2}:\d{2}:\d{2}\s*[AP]M)\]\s*(.+?):\s*(.*)$',
+  '^' + _lrm + r'?\[(\d{2}/\d{2}/\d{2}),\s*(\d{1,2}:\d{2}:\d{2}\s*[AP]M)\]\s*(.+?):\s*(.*)$',
   caseSensitive: false,
 );
 
-final _attachedRe = RegExp(r'^[\u200e\s]*<attached:\s*([^>]+)>', caseSensitive: false);
+/// Helper to extract media filename if <attached: ...> is present in the line (anywhere).
+/// Returns the media name and the text with the tag removed (caption remains).
+({String? media, String cleanedText}) _parseAttached(String lineText) {
+  final lower = lineText.toLowerCase();
+  final startIdx = lower.indexOf('<attached:');
+  if (startIdx == -1) {
+    return (media: null, cleanedText: lineText.trim());
+  }
+  final contentStart = startIdx + '<attached:'.length;
+  final endIdx = lineText.indexOf('>', contentStart);
+  if (endIdx == -1) {
+    return (media: null, cleanedText: lineText.trim());
+  }
+  final media = lineText.substring(contentStart, endIdx).trim();
+  // remove from startIdx to endIdx+1
+  final before = lineText.substring(0, startIdx).trimRight();
+  final after = lineText.substring(endIdx + 1).trimLeft();
+  final cleaned = [before, after].where((s) => s.isNotEmpty).join(' ').trim();
+  return (media: media, cleanedText: cleaned);
+}
 
 final _dateFormat = DateFormat('dd/MM/yy, h:mm:ss a');
 
@@ -27,11 +48,6 @@ List<ChatMessage> parseChat(String rawContent, {List<String> myAliases = const [
 
     final match = _timestampRe.firstMatch(line);
     if (match != null) {
-      // Finish previous accumulated message
-      if (current != null) {
-        messages.add(current);
-      }
-
       final datePart = match.group(1)!;
       final timePart = match.group(2)!;
       final sender = match.group(3)!.trim();
@@ -41,7 +57,6 @@ List<ChatMessage> parseChat(String rawContent, {List<String> myAliases = const [
       try {
         ts = _dateFormat.parse('$datePart, $timePart', true).toLocal();
       } catch (_) {
-        // Fallback: try with different spacing or unicode
         final cleaned = '$datePart, ${timePart.replaceAll('\u202f', ' ')}';
         try {
           ts = _dateFormat.parse(cleaned, true).toLocal();
@@ -50,53 +65,94 @@ List<ChatMessage> parseChat(String rawContent, {List<String> myAliases = const [
         }
       }
 
-      // Check for attachment on this line
-      final attachMatch = _attachedRe.firstMatch(text);
-      String? media;
+      // Check for attachment on this line (using robust helper)
+      final attachedInfo = _parseAttached(text);
+      String? media = attachedInfo.media;
       MessageType type = MessageType.text;
+      String finalText = attachedInfo.cleanedText;
 
-      if (attachMatch != null) {
-        media = attachMatch.group(1)!.trim();
+      if (media != null) {
         type = getMediaTypeFromFilename(media);
-        text = ''; // attachment line has no other text
       } else if (sender.toLowerCase().contains('end-to-end') || text.toLowerCase().contains('encrypted')) {
         type = MessageType.system;
+      }
+
+      // Check if this timestamped line is a caption for a previous media message
+      if (current != null &&
+          current.mediaPath != null &&
+          sender.toLowerCase() == current.sender.toLowerCase() &&
+          (ts.difference(current.timestamp).inSeconds.abs() < 120) &&
+          media == null) {
+        // Append as caption to the existing media message (immutable)
+        final newText = current.text.isNotEmpty
+            ? '${current.text}\n$finalText'
+            : finalText;
+
+        current = ChatMessage(
+          timestamp: current.timestamp,
+          sender: current.sender,
+          text: newText,
+          mediaPath: current.mediaPath,
+          type: current.type,
+        );
+        continue;
+      }
+
+      // Normal case: finish previous message
+      if (current != null) {
+        messages.add(current);
       }
 
       current = ChatMessage(
         timestamp: ts,
         sender: sender,
-        text: text.trim(),
+        text: finalText,
         mediaPath: media,
         type: type,
       );
       continue;
     }
 
-    // Continuation of previous message (multi-line)
+    // Continuation of previous message (multi-line) -- may contain <attached> tag
     if (current != null) {
       final cont = line.trim();
       if (cont.isNotEmpty) {
-        if (current.text.isEmpty) {
+        final attachedInfo = _parseAttached(cont);
+        if (attachedInfo.media != null) {
+          // Media tag found inside a continuation line
+          final newMedia = attachedInfo.media!;
+          final newType = getMediaTypeFromFilename(newMedia);
+          // keep any caption text from the cont (tag already stripped by helper)
+          final cleanedCont = attachedInfo.cleanedText;
+
+          final newText = current.text.isNotEmpty && cleanedCont.isNotEmpty
+              ? '${current.text}\n$cleanedCont'
+              : (cleanedCont.isNotEmpty ? cleanedCont : current.text);
+
           current = ChatMessage(
             timestamp: current.timestamp,
             sender: current.sender,
-            text: cont,
-            mediaPath: current.mediaPath,
-            type: current.type,
+            text: newText,
+            mediaPath: newMedia,
+            type: newType,
           );
         } else {
+          // Regular text continuation
+          final newText = current.text.isEmpty
+              ? cont
+              : '${current.text}\n$cont';
+
           current = ChatMessage(
             timestamp: current.timestamp,
             sender: current.sender,
-            text: '${current.text}\n$cont',
+            text: newText,
             mediaPath: current.mediaPath,
             type: current.type,
           );
         }
       }
     } else {
-      // Orphan line before first message; treat as system if relevant
+      // Orphan line before first message
       messages.add(ChatMessage(
         timestamp: DateTime.now(),
         sender: 'System',
@@ -133,6 +189,11 @@ String buildPreview(List<ChatMessage> messages) {
   final last = messages.last;
 
   if (last.mediaPath != null) {
+    if (last.text.isNotEmpty) {
+      final txt = last.text.replaceAll('\n', ' ').trim();
+      final p = txt.length > 50 ? '${txt.substring(0, 47)}...' : txt;
+      return '${last.sender}: $p';
+    }
     final label = last.type.displayName.isNotEmpty
         ? last.type.displayName
         : 'file';

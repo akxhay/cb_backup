@@ -243,6 +243,13 @@ flutter test
   - Import as new for same base title now uses labels e.g. "Rashmi Arya (2)", keeping participant/sender names unchanged.
   - Merge popup presents options for each labeled version to merge into.
   - Uses extractBaseChatTitle / extractLabelNumber.
+- **2026-06-21**: Media with captions now properly handled:
+  - Parser detects <attached: ...> on its line or inside multi-line continuation, and associates following/same-line text as caption (when same sender, close timestamp).
+  - Strips the <attached> tag; caption text is stored in message.text for the media item.
+  - In bubbles: caption shown above image/video (limited lines), or integrated in doc row.
+  - Gallery overlays caption (or filename) for non-photos.
+  - buildPreview prefers caption text when present.
+  - Sample "Kyc Modern team" used for testing the cases.
 - **2026-06-21**: Fixed persisted chats not loading after force close / rebuild on iPhone:
   - Made _persist and all messages.json writes atomic (write to .tmp + rename + flush) to survive force close during write.
   - load() now notifies listeners after populating (helps watchers on cold start).

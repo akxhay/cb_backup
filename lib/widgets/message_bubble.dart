@@ -100,33 +100,53 @@ class MessageBubble extends StatelessWidget {
         final file = File(mediaFullPath!);
         content = GestureDetector(
           onTap: () => _openMedia(context),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.file(
-              file,
-              width: 220,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 220,
-                height: 140,
-                color: Colors.grey.shade300,
-                alignment: Alignment.center,
-                child: const Icon(Icons.broken_image, size: 40),
+          child: Column(
+            crossAxisAlignment: align,
+            children: [
+              if (message.text.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(message.text, style: TextStyle(color: textColor, fontSize: 14), maxLines: 4, overflow: TextOverflow.ellipsis),
+                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  file,
+                  width: 220,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 220,
+                    height: 140,
+                    color: Colors.grey.shade300,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.broken_image, size: 40),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         );
       } else if (message.type == MessageType.video) {
         content = GestureDetector(
           onTap: () => _openMedia(context),
-          child: VideoThumbnailWidget(
-            path: mediaFullPath!,
-            width: 220,
-            height: 140,
+          child: Column(
+            crossAxisAlignment: align,
+            children: [
+              if (message.text.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(message.text, style: TextStyle(color: textColor, fontSize: 14), maxLines: 4, overflow: TextOverflow.ellipsis),
+                ),
+              VideoThumbnailWidget(
+                path: mediaFullPath!,
+                width: 220,
+                height: 140,
+              ),
+            ],
           ),
         );
       } else {
-        // Audio, Document, etc.
+        // Audio, Document, etc. (may have caption in .text)
         final filename = message.mediaPath!.split(RegExp(r'[/\\]')).last;
         content = GestureDetector(
           onTap: () => _openMedia(context),
@@ -153,16 +173,16 @@ class MessageBubble extends StatelessWidget {
                       if (message.text.isNotEmpty)
                         Text(
                           message.text,
-                          style: TextStyle(color: textColor, fontSize: 13),
-                          maxLines: 1,
+                          style: TextStyle(color: textColor, fontSize: 14),
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
+                      if (message.text.isNotEmpty) const SizedBox(height: 2),
                       Text(
                         filename,
                         style: TextStyle(
-                          color: textColor,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
+                          color: textColor.withOpacity(0.75),
+                          fontSize: 12,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -187,11 +207,6 @@ class MessageBubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (message.text.isNotEmpty && hasMedia)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(message.text, style: TextStyle(color: textColor, fontSize: 14)),
-          ),
         content,
         const SizedBox(height: 4),
         Align(
