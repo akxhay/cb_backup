@@ -274,7 +274,9 @@ class ChatRepository extends ChangeNotifier {
     try {
       final content = await messagesFile.readAsString();
       final data = jsonDecode(content) as List;
-      return data.map((j) => ChatMessage.fromJson((j as Map).cast<String, dynamic>())).toList();
+      return data
+          .map((j) => ChatMessage.fromJson((j as Map).cast<String, dynamic>()))
+          .toList();
     } catch (_) {
       // If json corrupt, fallback to txt
       final txt = File(p.join(chat.extractedDir, '_chat.txt'));

@@ -326,7 +326,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
-                    chat.lastMessagePreview ?? '${chat.messageCount} messages',
+                    (chat.lastMessagePreview ?? '').trim().isNotEmpty
+                        ? chat.lastMessagePreview!
+                        : '${chat.messageCount} messages',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

@@ -41,10 +41,12 @@ class ChatMessage {
   bool get isFromSelf => false; // resolved at runtime using aliases
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final rawText = (json['text'] as String?) ?? '';
+    final cleanText = rawText.replaceAll('\u200E', '').trim();
     return ChatMessage(
       timestamp: DateTime.parse(json['timestamp'] as String),
       sender: json['sender'] as String,
-      text: json['text'] as String,
+      text: cleanText,
       mediaPath: json['mediaPath'] as String?,
       type: MessageType.values.firstWhere(
         (e) => e.name == (json['type'] as String? ?? 'text'),

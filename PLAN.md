@@ -139,6 +139,17 @@ sample/
 
 ## Recent Changes
 
+### 2026-06-21 - Chat list preview now shows media last messages correctly (no longer blank)
+- Fixed bug where home screen (chat list) subtitle was blank (or fell back to message count) when the most recent message in a chat was a media item (photo/video/audio/doc) without a text caption.
+- Root cause: WhatsApp exports often prefix attachment tags with LRM (\u200E) direction mark; pure media messages ended up with non-empty but invisible `.text` containing only LRM. `buildPreview` took the "has caption" branch producing "Sender: " (blank-looking).
+- Changes:
+  - `_parseAttached`, timestamp capture, and continuations now strip LRM early.
+  - `buildPreview` now strips LRM when deciding visible caption text for both media and text cases (robust even for legacy data).
+  - `ChatMessage.fromJson` always cleans LRM from stored `text` (so old persisted messages.json get tidy text on load).
+  - ListTile subtitle now defensively falls back to count if preview is empty/whitespace.
+- Result: last media now correctly shows e.g. "Rashmi sent a photo", "Alex sent a video" on the home screen list.
+- Also keeps chat bubbles and captions clean.
+
 ### 2026-06-21 - Modern full-screen media gallery (icon last + separate tabs + stickers)
 - Replaced popup "View all media" dialog with a last-position icon button in the chat AppBar (photo_library icon).
 - Implemented full-screen `_MediaGalleryScreen` with 6 scrollable tabs: All / Photos / Stickers / Videos / Documents / Audio.
@@ -224,6 +235,7 @@ flutter test
 ## Change Log
 
 - **2026-06-21**: Added full support for all media types (images, video, audio, documents, stickers). Media gallery moved to last AppBar icon, now full-screen modern with separate sections for photos/stickers/videos/documents/audio + catchy design. (see "Recent Changes")
+- **2026-06-21**: Fixed home screen (chat list) last-message preview being blank for media-only last messages. LRM stripping + robust buildPreview + defensive display. Now shows "sent a photo" etc. correctly.
 - **2026-06-21**: Fixed build error: Moved `IconData` / `Icons` logic out of `lib/models/chat.dart` (kept models Flutter-free). Icon mapping now lives in `message_bubble.dart`.
 - **2026-06-21**: Major WhatsApp-like UI improvements:
   - Bubbles now use authentic WhatsApp colors (light green sent / white received in light mode; dark green in dark mode).

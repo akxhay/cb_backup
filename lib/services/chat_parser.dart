@@ -12,6 +12,9 @@ final _timestampRe = RegExp(
 /// Helper to extract media filename if <attached: ...> is present in the line (anywhere).
 /// Returns the media name and the text with the tag removed (caption remains).
 ({String? media, String cleanedText}) _parseAttached(String lineText) {
+  // Strip LRM (and any direction marks) that WhatsApp inserts before attachments in some exports.
+  // This ensures pure media messages have truly empty .text so buildPreview shows "sent a photo" etc.
+  lineText = lineText.replaceAll(_lrm, '');
   final lower = lineText.toLowerCase();
   final startIdx = lower.indexOf('<attached:');
   if (startIdx == -1) {
@@ -62,7 +65,7 @@ List<ChatMessage> parseChat(String rawContent, {List<String> myAliases = const [
       final datePart = match.group(1)!;
       final timePart = match.group(2)!;
       final sender = match.group(3)!.trim();
-      String text = match.group(4) ?? '';
+      String text = (match.group(4) ?? '').replaceAll(_lrm, '');
 
       DateTime ts;
       try {
@@ -130,7 +133,7 @@ List<ChatMessage> parseChat(String rawContent, {List<String> myAliases = const [
 
     // Continuation of previous message (multi-line) -- may contain <attached> tag
     if (current != null) {
-      final cont = line.trim();
+      final cont = line.trim().replaceAll(_lrm, '');
       if (cont.isNotEmpty) {
         final attachedInfo = _parseAttached(cont);
         if (attachedInfo.media != null) {
@@ -172,7 +175,7 @@ List<ChatMessage> parseChat(String rawContent, {List<String> myAliases = const [
       }
     } else {
       // Orphan line before first message
-      final stripped = _stripEditedMarker(line.trim());
+      final stripped = _stripEditedMarker(line.trim().replaceAll(_lrm, ''));
       messages.add(ChatMessage(
         timestamp: DateTime.now(),
         sender: 'System',
@@ -210,19 +213,25 @@ String buildPreview(List<ChatMessage> messages) {
   final last = messages.last;
 
   if (last.mediaPath != null) {
-    if (last.text.isNotEmpty) {
-      final txt = last.text.replaceAll('\n', ' ').trim();
-      final p = txt.length > 50 ? '${txt.substring(0, 47)}...' : txt;
+    // Treat LRM-only or whitespace-only as "no caption" so we get nice "sent a photo"
+    final visibleCaption = last.text.replaceAll(_lrm, '').replaceAll('\n', ' ').trim();
+    if (visibleCaption.isNotEmpty) {
+      final p = visibleCaption.length > 50 ? '${visibleCaption.substring(0, 47)}...' : visibleCaption;
       return '${last.sender}: $p';
     }
-    final label = last.type.displayName.isNotEmpty
-        ? last.type.displayName
-        : 'file';
+    String label;
+    if (isSticker(last)) {
+      label = 'sticker';
+    } else if (last.type.displayName.isNotEmpty) {
+      label = last.type.displayName;
+    } else {
+      label = 'file';
+    }
     final article = (label == 'photo' || label == 'audio') ? 'an' : 'a';
     return '${last.sender} sent $article $label';
   }
 
-  final txt = last.text.replaceAll('\n', ' ');
+  final txt = last.text.replaceAll(_lrm, '').replaceAll('\n', ' ').trim();
   final preview = txt.length > 60 ? '${txt.substring(0, 57)}...' : txt;
   return '${last.sender}: $preview';
 }
