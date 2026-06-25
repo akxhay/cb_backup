@@ -29,20 +29,33 @@ class _SelfChooserDialogState extends State<SelfChooserDialog> {
       title: const Text('Who are you in this chat?'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Select your name so messages are aligned correctly.'),
           const SizedBox(height: 12),
-          ...widget.candidates.map((name) => RadioListTile<String>(
-                title: Text(name),
-                value: name,
-                groupValue: _selected,
-                onChanged: (v) => setState(() => _selected = v),
-              )),
-          RadioListTile<String>(
-            title: const Text('Other / custom name'),
-            value: '',
-            groupValue: _selected,
-            onChanged: (v) => setState(() => _selected = v),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.4,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...widget.candidates.map((name) => RadioListTile<String>(
+                        title: Text(name),
+                        value: name,
+                        groupValue: _selected,
+                        onChanged: (v) => setState(() => _selected = v),
+                      )),
+                  RadioListTile<String>(
+                    title: const Text('Other / custom name'),
+                    value: '',
+                    groupValue: _selected,
+                    onChanged: (v) => setState(() => _selected = v),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
