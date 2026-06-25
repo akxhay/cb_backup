@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'chat_avatar.dart';
+
 class SelfChooserDialog extends StatefulWidget {
   final List<String> candidates;
   final String? initialSelected;
@@ -25,14 +27,20 @@ class _SelfChooserDialogState extends State<SelfChooserDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text('Who are you in this chat?'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Select your name so messages are aligned correctly.'),
-          const SizedBox(height: 12),
+          Text(
+            'Pick your name so your messages appear on the right.',
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14, height: 1.35),
+          ),
+          const SizedBox(height: 16),
           ConstrainedBox(
             constraints: BoxConstraints(
               maxHeight: MediaQuery.sizeOf(context).height * 0.4,
@@ -41,17 +49,18 @@ class _SelfChooserDialogState extends State<SelfChooserDialog> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ...widget.candidates.map((name) => RadioListTile<String>(
-                        title: Text(name),
+                  ...widget.candidates.map((name) => _IdentityOption(
+                        name: name,
                         value: name,
                         groupValue: _selected,
-                        onChanged: (v) => setState(() => _selected = v),
+                        onTap: () => setState(() => _selected = name),
                       )),
-                  RadioListTile<String>(
-                    title: const Text('Other / custom name'),
+                  _IdentityOption(
+                    name: 'Other / custom name',
                     value: '',
                     groupValue: _selected,
-                    onChanged: (v) => setState(() => _selected = v),
+                    isCustom: true,
+                    onTap: () => setState(() => _selected = ''),
                   ),
                 ],
               ),
@@ -66,6 +75,70 @@ class _SelfChooserDialogState extends State<SelfChooserDialog> {
           child: const Text('Confirm'),
         ),
       ],
+    );
+  }
+}
+
+class _IdentityOption extends StatelessWidget {
+  final String name;
+  final String value;
+  final String? groupValue;
+  final bool isCustom;
+  final VoidCallback onTap;
+
+  const _IdentityOption({
+    required this.name,
+    required this.value,
+    required this.groupValue,
+    required this.onTap,
+    this.isCustom = false,
+  });
+
+  bool get isSelected => groupValue == value;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        color: isSelected ? cs.primaryContainer.withValues(alpha: 0.45) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              children: [
+                if (isCustom)
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: cs.surfaceContainerHighest,
+                    child: Icon(Icons.edit_outlined, size: 18, color: cs.onSurfaceVariant),
+                  )
+                else
+                  ChatAvatar(name: name, radius: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+                Radio<String>(
+                  value: value,
+                  groupValue: groupValue,
+                  onChanged: (_) => onTap(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

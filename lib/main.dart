@@ -30,6 +30,45 @@ Future<void> main() async {
   );
 }
 
+ThemeData _buildTheme(Brightness brightness) {
+  final isDark = brightness == Brightness.dark;
+  return ThemeData(
+    useMaterial3: true,
+    colorSchemeSeed: const Color(0xFF00A884),
+    brightness: brightness,
+    scaffoldBackgroundColor: isDark ? const Color(0xFF111B21) : const Color(0xFFFFFFFF),
+    appBarTheme: AppBarTheme(
+      centerTitle: false,
+      elevation: 0,
+      scrolledUnderElevation: 1,
+      backgroundColor: isDark ? const Color(0xFF1F2C34) : const Color(0xFFF0F2F5),
+      foregroundColor: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
+      surfaceTintColor: Colors.transparent,
+    ),
+    dividerTheme: DividerThemeData(
+      color: isDark ? const Color(0xFF2A3942) : const Color(0xFFE9EDEF),
+      thickness: 1,
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: const Color(0xFF00A884),
+      foregroundColor: Colors.white,
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(24),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    ),
+    listTileTheme: const ListTileThemeData(
+      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+    ),
+  );
+}
+
 class CbbackupApp extends StatelessWidget {
   const CbbackupApp({super.key});
 
@@ -40,52 +79,8 @@ class CbbackupApp extends StatelessWidget {
     return MaterialApp(
       title: 'CB Backup',
       themeMode: themeService.themeMode,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.teal,
-        brightness: Brightness.light,
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
-          elevation: 1,
-          scrolledUnderElevation: 2,
-        ),
-        cardTheme: CardThemeData(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 1,
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(28),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.teal,
-        brightness: Brightness.dark,
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
-          elevation: 1,
-          scrolledUnderElevation: 2,
-        ),
-        cardTheme: CardThemeData(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(28),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
       home: const ChatListScreen(),
       debugShowCheckedModeBanner: false,
     );

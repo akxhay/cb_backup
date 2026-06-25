@@ -10,6 +10,8 @@ import '../models/chat.dart';
 import '../services/chat_parser.dart';
 import '../services/chat_repository.dart';
 import '../services/self_identity_service.dart';
+import '../widgets/chat_avatar.dart';
+import '../widgets/chat_search_bar.dart';
 import '../widgets/self_chooser_dialog.dart';
 import 'chat_screen.dart';
 import 'my_usernames_screen.dart';
@@ -492,31 +494,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     final displayChats = _isSearching ? _searchResults : chats;
 
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        title: _isSearching
-            ? TextField(
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Search chats...',
-                  border: InputBorder.none,
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                  _searchDebounce?.cancel();
-                  _searchDebounce = Timer(const Duration(milliseconds: 250), () {
-                    _performGlobalSearch(value);
-                  });
-                },
-              )
-            : const Text('CB Backup'),
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        title: const Text(
+          'Chats',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 22),
+        ),
         actions: [
-          if (_isSearching)
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () {
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
+            tooltip: _isSearching ? 'Close search' : 'Search chats',
+            onPressed: () {
+              if (_isSearching) {
                 setState(() {
                   _isSearching = false;
                   _searchQuery = '';
@@ -524,13 +518,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   _isLoadingSearch = false;
                 });
                 _searchDebounce?.cancel();
-              },
-            )
-          else ...[
-            IconButton(
-              icon: const Icon(Icons.search),
-              tooltip: 'Search chats',
-              onPressed: () {
+              } else {
                 final currentChats = context.read<ChatRepository>().chats;
                 setState(() {
                   _isSearching = true;
@@ -539,166 +527,110 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   _isLoadingSearch = false;
                 });
                 _searchDebounce?.cancel();
-              },
-            ),
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+          if (chats.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.settings),
-              tooltip: 'Settings',
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              tooltip: 'Delete all chats',
+              icon: const Icon(Icons.delete_sweep_outlined),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    title: const Text('Delete all chats?'),
+                    content: const Text('This will remove every imported chat from the app.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(c, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(c, true),
+                        child: const Text('Delete all'),
+                      ),
+                    ],
+                  ),
                 );
-              },
-            ),
-            if (chats.isNotEmpty)
-              IconButton(
-                tooltip: 'Delete all chats',
-                icon: const Icon(Icons.delete_sweep),
-                onPressed: () async {
+                if (confirm == true) {
                   for (final c in [...chats]) {
                     await context.read<ChatRepository>().deleteChat(c);
                   }
                   setState(() {});
-                },
-              ),
-          ],
+                }
+              },
+            ),
         ],
       ),
       body: chats.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.chat_outlined, size: 72, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  const SizedBox(height: 20),
-                  const Text('No chats yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Import a WhatsApp chat export (.zip)',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 28),
-                  FilledButton.icon(
-                    onPressed: _importing ? null : () => _importChat(context),
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Import chat zip'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                    ),
-                  ),
-                ],
-              ),
-            )
+          ? _EmptyChatsState(importing: _importing, onImport: () => _importChat(context))
           : Column(
               children: [
+                if (_isSearching)
+                  ChatSearchBar(
+                    hintText: 'Search chats, messages, or contacts...',
+                    autofocus: true,
+                    showClear: _searchQuery.isNotEmpty,
+                    onChanged: (value) {
+                      setState(() => _searchQuery = value);
+                      _searchDebounce?.cancel();
+                      _searchDebounce = Timer(
+                        const Duration(milliseconds: 250),
+                        () => _performGlobalSearch(value),
+                      );
+                    },
+                    onClear: () {
+                      setState(() => _searchQuery = '');
+                      _performGlobalSearch('');
+                    },
+                  ),
                 if (_isSearching && _searchQuery.isNotEmpty && _isLoadingSearch)
                   const LinearProgressIndicator(minHeight: 2),
                 Expanded(
                   child: displayChats.isEmpty && _isSearching && _searchQuery.isNotEmpty
                       ? Center(
-                          child: Text(
-                            'No results for "$_searchQuery"',
-                            style: Theme.of(context).textTheme.bodyLarge,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_off_rounded, size: 48, color: cs.onSurfaceVariant),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No results for "$_searchQuery"',
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                              ),
+                            ],
                           ),
                         )
-                      : ListView.builder(
+                      : ListView.separated(
                           itemCount: displayChats.length,
-                          padding: const EdgeInsets.only(top: 8, bottom: 80),
+                          padding: const EdgeInsets.only(bottom: 88),
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            indent: 76,
+                            color: cs.outlineVariant.withValues(alpha: 0.4),
+                          ),
                           itemBuilder: (context, index) {
                             final chat = displayChats[index];
-                            final preview = (chat.lastMessagePreview ?? '').trim().isNotEmpty
-                                ? chat.lastMessagePreview!
-                                : '${chat.messageCount} messages';
-
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              child: Card(
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
-                                  onTap: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)),
-                                    );
-                                  },
-                                  onLongPress: () => _deleteChat(chat),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Row(
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 26,
-                                          backgroundColor: chat.isGroup
-                                              ? Theme.of(context).colorScheme.primaryContainer
-                                              : Theme.of(context).colorScheme.secondaryContainer,
-                                          child: Icon(
-                                            chat.isGroup ? Icons.group : Icons.person,
-                                            color: chat.isGroup
-                                                ? Theme.of(context).colorScheme.onPrimaryContainer
-                                                : Theme.of(context).colorScheme.onSecondaryContainer,
-                                            size: 26,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 14),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                chat.title,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .titleMedium
-                                                    ?.copyWith(fontWeight: FontWeight.w600),
-                                              ),
-                                              const SizedBox(height: 3),
-                                              Text(
-                                                preview,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodyMedium
-                                                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          _formatDate(chat.importDate),
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelSmall
-                                              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        PopupMenuButton<String>(
-                                          icon: const Icon(Icons.more_vert, size: 18),
-                                          onSelected: (value) {
-                                            if (value == 'delete') {
-                                              _deleteChat(chat);
-                                            }
-                                          },
-                                          itemBuilder: (c) => [
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.delete, color: Colors.red, size: 20),
-                                                  SizedBox(width: 8),
-                                                  Text('Delete chat'),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
+                            return _ChatListTile(
+                              chat: chat,
+                              dateLabel: _formatDate(chat.importDate),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)),
+                                );
+                              },
+                              onDelete: () => _deleteChat(chat),
                             );
                           },
                         ),
@@ -706,12 +638,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ],
             ),
       floatingActionButton: chats.isNotEmpty
-          ? FloatingActionButton(
+          ? FloatingActionButton.extended(
               onPressed: _importing ? null : () => _importChat(context),
               tooltip: 'Import chat zip',
-              child: _importing
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Icon(Icons.add),
+              icon: _importing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.add_rounded),
+              label: const Text('Import'),
             )
           : null,
     );
@@ -730,5 +667,153 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _intentSubscription.cancel();
     _searchDebounce?.cancel();
     super.dispose();
+  }
+}
+
+class _ChatListTile extends StatelessWidget {
+  final Chat chat;
+  final String dateLabel;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _ChatListTile({
+    required this.chat,
+    required this.dateLabel,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final preview = (chat.lastMessagePreview ?? '').trim().isNotEmpty
+        ? chat.lastMessagePreview!
+        : '${chat.messageCount} messages';
+
+    return Material(
+      color: cs.surface,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onDelete,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ChatAvatar(
+                name: chat.title,
+                radius: 28,
+                isGroup: chat.isGroup,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            chat.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          dateLabel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyChatsState extends StatelessWidget {
+  final bool importing;
+  final VoidCallback onImport;
+
+  const _EmptyChatsState({
+    required this.importing,
+    required this.onImport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: cs.primaryContainer.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.forum_outlined,
+                size: 48,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Your chats live here',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Import a WhatsApp chat export (.zip) to browse your backup with a familiar chat interface.',
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
+                fontSize: 15,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: importing ? null : onImport,
+              icon: const Icon(Icons.upload_file_rounded),
+              label: const Text('Import chat zip'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

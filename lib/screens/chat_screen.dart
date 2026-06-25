@@ -9,8 +9,13 @@ import '../models/chat.dart';
 import '../services/chat_parser.dart';
 import '../services/chat_repository.dart';
 import '../services/self_identity_service.dart';
-import '../widgets/self_chooser_dialog.dart';
+import '../theme/chat_theme.dart';
+import '../widgets/chat_avatar.dart';
+import '../widgets/chat_background.dart';
+import '../widgets/chat_search_bar.dart';
+import '../widgets/full_screen_image_viewer.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/self_chooser_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   final Chat chat;
@@ -94,27 +99,64 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildDateSeparator(DateTime date) {
-    final cs = Theme.of(context).colorScheme;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12),
+      margin: const EdgeInsets.symmetric(vertical: 14),
       alignment: Alignment.center,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
+          color: ChatTheme.datePillColor(context),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 2,
+            ),
+          ],
         ),
         child: Text(
           _formatDateHeader(date),
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: cs.onSurfaceVariant,
-            letterSpacing: 0.3,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: ChatTheme.datePillTextColor(context),
+            letterSpacing: 0.2,
           ),
         ),
       ),
     );
+  }
+
+  bool _isGroupedWithPrevious(int displayIndex) {
+    if (displayIndex <= 0) return false;
+    final current = _displayItems[displayIndex];
+    if (current is! ChatMessage || current.type == MessageType.system) return false;
+
+    for (var i = displayIndex - 1; i >= 0; i--) {
+      final prev = _displayItems[i];
+      if (prev is DateTime) return false;
+      if (prev is ChatMessage) {
+        if (prev.type == MessageType.system) return false;
+        return prev.sender == current.sender && _isSelf(prev) == _isSelf(current);
+      }
+    }
+    return false;
+  }
+
+  bool _isGroupedWithNext(int displayIndex) {
+    if (displayIndex >= _displayItems.length - 1) return false;
+    final current = _displayItems[displayIndex];
+    if (current is! ChatMessage || current.type == MessageType.system) return false;
+
+    for (var i = displayIndex + 1; i < _displayItems.length; i++) {
+      final next = _displayItems[i];
+      if (next is DateTime) return false;
+      if (next is ChatMessage) {
+        if (next.type == MessageType.system) return false;
+        return next.sender == current.sender && _isSelf(next) == _isSelf(current);
+      }
+    }
+    return false;
   }
 
   void _applyFilter() {
@@ -239,41 +281,56 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final subtitle = widget.chat.isGroup
+        ? '${widget.chat.participants.length} participants · ${_allMessages.length} messages'
+        : '${_allMessages.length} messages';
+
     return Scaffold(
+      backgroundColor: ChatTheme.chatBackground(context),
       appBar: AppBar(
-        leadingWidth: 56,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 8.0),
-          child: CircleAvatar(
-            radius: 18,
-            backgroundColor: widget.chat.isGroup
-                ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.secondaryContainer,
-            child: Icon(
-              widget.chat.isGroup ? Icons.group : Icons.person,
-              color: widget.chat.isGroup
-                  ? Theme.of(context).colorScheme.onPrimaryContainer
-                  : Theme.of(context).colorScheme.onSecondaryContainer,
-              size: 20,
-            ),
-          ),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        leadingWidth: 40,
+        titleSpacing: 0,
+        title: Row(
           children: [
-            Text(widget.chat.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text(
-              widget.chat.isGroup
-                  ? '${widget.chat.participants.length} participants'
-                  : widget.chat.participants.join(', '),
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ChatAvatar(
+              name: widget.chat.title,
+              radius: 20,
+              isGroup: widget.chat.isGroup,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.chat.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 17,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: Icon(_showSearch ? Icons.search_off : Icons.search),
+            icon: Icon(_showSearch ? Icons.close_rounded : Icons.search_rounded),
             tooltip: _showSearch ? 'Hide search' : 'Search in chat',
             onPressed: () {
               setState(() {
@@ -288,12 +345,12 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (!widget.chat.isGroup)
             IconButton(
-              icon: const Icon(Icons.person_outline),
+              icon: const Icon(Icons.swap_horiz_rounded),
               tooltip: 'Change perspective',
               onPressed: _changePerspective,
             ),
           IconButton(
-            icon: const Icon(Icons.photo_library_rounded),
+            icon: const Icon(Icons.photo_library_outlined),
             tooltip: 'View all media',
             onPressed: _openMediaGallery,
           ),
@@ -302,73 +359,87 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           if (_showSearch)
-            // Search bar - shown only when search icon is tapped
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: TextField(
-                controller: _searchCtrl,
-                style: const TextStyle(fontSize: 15),
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Search in chat...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _search.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                          },
-                        )
-                      : null,
-                  isDense: true,
-                  filled: true,
-                ),
-              ),
+            ChatSearchBar(
+              controller: _searchCtrl,
+              hintText: 'Search in chat...',
+              autofocus: true,
+              showClear: _search.isNotEmpty,
+              onClear: _searchCtrl.clear,
             ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _filtered.isEmpty
                     ? Center(
-                        child: Text(_search.isEmpty
-                            ? 'No messages loaded yet'
-                            : 'No matches for "$_search"'),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _search.isEmpty
+                                  ? Icons.chat_bubble_outline_rounded
+                                  : Icons.search_off_rounded,
+                              size: 48,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _search.isEmpty
+                                  ? 'No messages loaded yet'
+                                  : 'No matches for "$_search"',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       )
-                    : Container(
-                        color: Theme.of(context).colorScheme.surface,
+                    : ChatBackground(
                         child: ListView.builder(
                           reverse: true,
-                          padding: const EdgeInsets.only(top: 8, bottom: 12),
+                          padding: const EdgeInsets.only(top: 8, bottom: 8),
                           itemCount: _displayItems.length,
-                        itemBuilder: (context, index) {
-                          // reverse indexing for display (newest bottom)
-                          final item = _displayItems[_displayItems.length - 1 - index];
+                          itemBuilder: (context, index) {
+                            final displayIndex =
+                                _displayItems.length - 1 - index;
+                            final item = _displayItems[displayIndex];
 
-                          if (item is DateTime) {
-                            return _buildDateSeparator(item);
-                          }
+                            if (item is DateTime) {
+                              return _buildDateSeparator(item);
+                            }
 
-                          final msg = item as ChatMessage;
-                          final isSelf = _isSelf(msg);
-                          final mediaPath = msg.mediaPath != null ? _resolveMedia(msg) : null;
-                          return MessageBubble(
-                            message: msg,
-                            isSelf: isSelf,
-                            mediaFullPath: mediaPath,
-                            showSenderName: widget.chat.isGroup,
-                          );
-                        },
+                            final msg = item as ChatMessage;
+                            final isSelf = _isSelf(msg);
+                            final mediaPath =
+                                msg.mediaPath != null ? _resolveMedia(msg) : null;
+                            return MessageBubble(
+                              message: msg,
+                              isSelf: isSelf,
+                              mediaFullPath: mediaPath,
+                              showSenderName: widget.chat.isGroup,
+                              groupedAbove:
+                                  _isGroupedWithPrevious(displayIndex),
+                              groupedBelow: _isGroupedWithNext(displayIndex),
+                            );
+                          },
+                        ),
                       ),
-                    ),
           ),
           if (_search.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.all(4),
-              child: Text(
-                '${_filtered.length} of ${_allMessages.length} messages',
-                style: theme.textTheme.bodySmall,
+            Material(
+              color: theme.colorScheme.surface,
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  '${_filtered.length} of ${_allMessages.length} messages',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
-            ),
+            )
+          else
+            _ArchiveFooter(messageCount: _allMessages.length),
         ],
       ),
     );
@@ -457,56 +528,10 @@ class _MediaGalleryScreenState extends State<_MediaGalleryScreen> {
   }
 
   void _showFullScreenImage(String path, String caption) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            iconTheme: const IconThemeData(color: Colors.white),
-            title: const Text('Preview', style: TextStyle(color: Colors.white70, fontSize: 16)),
-          ),
-          body: Stack(
-            children: [
-              Center(
-                child: InteractiveViewer(
-                  minScale: 0.5,
-                  maxScale: 6.0,
-                  child: Image.file(
-                    File(path),
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(Icons.broken_image, color: Colors.white38, size: 80),
-                    ),
-                  ),
-                ),
-              ),
-              if (caption.isNotEmpty)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black87],
-                      ),
-                    ),
-                    child: Text(
-                      caption,
-                      style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.3),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+    FullScreenImageViewer.show(
+      context,
+      imagePath: path,
+      caption: caption.isNotEmpty ? caption : null,
     );
   }
 
@@ -690,12 +715,13 @@ class _MediaGalleryScreenState extends State<_MediaGalleryScreen> {
       length: 6,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Media • $total'),
+          title: Text('Media · $total'),
           bottom: TabBar(
             isScrollable: true,
-            labelColor: Colors.teal,
-            indicatorColor: Colors.teal,
-            unselectedLabelColor: Colors.grey,
+            labelColor: Theme.of(context).colorScheme.primary,
+            indicatorColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            dividerColor: Theme.of(context).dividerColor.withValues(alpha: 0.3),
             tabs: [
               Tab(text: 'All (${_allMedia.length})'),
               Tab(text: 'Photos (${_photos.length})'),
@@ -715,6 +741,45 @@ class _MediaGalleryScreenState extends State<_MediaGalleryScreen> {
             _buildModernGrid(_documents),
             _buildModernGrid(_audios),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ArchiveFooter extends StatelessWidget {
+  final int messageCount;
+
+  const _ArchiveFooter({required this.messageCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.surface.withValues(alpha: 0.95),
+      elevation: 4,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.archive_outlined, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  messageCount > 0
+                      ? 'Viewing backup archive · $messageCount messages'
+                      : 'Viewing backup archive',
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              Icon(Icons.lock_outline_rounded, size: 16, color: cs.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );
